@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  skland-sign:
+    build: .
+    container_name: skland-sign
+    restart: always
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - TZ=Asia/Shanghai

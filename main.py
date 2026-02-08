@@ -3,7 +3,7 @@ import asyncio
 import yaml
 import logging
 from skland_api import SklandAPI
-from qmsg import QmsgNotifier
+from notifier import NotifierManager
 
 # 初始化基础日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,13 +26,13 @@ async def run_sign_in():
         lib_logger.setLevel(logging.INFO if user_log_level == "debug" else WARNING)
 
     users = config.get("users", [])
-    qmsg_key = config.get("qmsg_key")
 
     if not users:
         logger.warning("配置中没有发现用户信息")
         return
 
     api = SklandAPI(max_retries=3)
+    notifier = NotifierManager(config)
     
     # 3. 准备消息头部
     # 格式要求: 📅 森空岛签到姬
@@ -104,14 +104,11 @@ async def run_sign_in():
     await api.close()
     
     # 4. 发送推送
-    if qmsg_key:
-        notifier = QmsgNotifier(qmsg_key)
-        # 移除列表末尾多余的空行
-        while notify_lines and notify_lines[-1] == "":
-            notify_lines.pop()
-            
-        final_message = "\n".join(notify_lines)
-        await notifier.send(final_message)
+    while notify_lines and notify_lines[-1] == "":
+        notify_lines.pop()
+
+    final_message = "\n".join(notify_lines)
+    await notifier.send_all(final_message)
         
     logger.info("所有任务已完成")
 

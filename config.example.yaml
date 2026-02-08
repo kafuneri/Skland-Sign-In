@@ -1,14 +1,64 @@
+# ======================== 基础配置 ========================
+
 # 日志等级: "debug" (显示详细请求) 或 "info" (只显示结果)
 log_level: "info"
 
-# Qmsg酱 推送 Key (不需要推送则留空)
-qmsg_key: ""
+# 定时任务 cron 表达式 (Docker 环境下生效)
+# 默认每天凌晨 1:00 执行
+cron: "0 1 * * *"
 
-# 用户列表
-# 给账号起个名字，方便区分
+# ======================== 用户列表 ========================
+
 users:
-  - nickname: "我的大号"       
+  - nickname: "我的大号"
     token: "这里填入教程中获取的Token"
-    
+
   - nickname: "我的小号"
     token: "这里填入另一个Token"
+
+# ======================== 通知配置 ========================
+# 只需填写你要使用的渠道，留空或不填则不启用该渠道
+
+notify:
+
+  # ---------- Qmsg 酱 ----------
+  qmsg:
+    key: ""# Qmsg Key
+    # base_url: "https://qmsg.zendee.cn" # 可选，自定义接口地址
+
+    # ---------- OneBot V11 (NapCat / go-cqhttp 等) ----------
+  # 私聊和群聊可同时配置，均支持多个目标
+  onebot:
+    url: ""                # OneBot HTTP 地址，如 http://127.0.0.1:3000
+    access_token: ""                     # 可选，鉴权 Token
+    private_ids:                         # 私聊 QQ 号列表 (可填多个)
+      # - 123456789
+      # - 987654321
+    group_ids:# 群号列表 (可填多个）
+      # - 111222333
+      # - 444555666
+
+  # ---------- 邮件 ----------
+  email:
+    smtp_host: ""# SMTP 服务器，如 smtp.qq.com
+    smtp_port: 465                       # 端口，SSL 一般 465，STARTTLS 一般 587
+    use_ssl: true                        # 是否使用 SSL
+    username: ""                         # 登录用户名 (通常是邮箱地址)
+    password: ""                         # 登录密码或授权码
+    sender: ""                           # 发件人地址 (留空则与 username 相同)
+    receiver: ""                         # 收件人地址
+
+  # ---------- 企业微信群机器人 ----------
+  wecom:
+    webhook_url: ""# 企业微信机器人 Webhook 地址
+
+  # ---------- 微信服务号 (公众号模板消息) ----------
+  wechat_mp:
+    app_id: ""# 公众号 AppID
+    app_secret: ""                       # 公众号 AppSecret
+    template_id: ""                      # 模板消息 ID
+    open_id: ""                          # 接收者的 OpenID
+
+  # ---------- Server酱 ----------
+  serverchan:
+    send_key: ""                         # Server酱 SendKey

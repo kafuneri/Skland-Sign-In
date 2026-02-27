@@ -1,8 +1,9 @@
-version: "3.8"
-
 services:
   skland-sign:
-    build: .
+    # 默认使用预构建镜像
+    image: kafuneri/skland-sign-in:latest    
+    # 如果你需要修改源码并进行本地构建，请注释掉上面的 image 行，并取消下方 build 行的注释
+    # build: .    
     container_name: skland-sign
     restart: always
     volumes:

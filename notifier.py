@@ -16,15 +16,23 @@ class NotifierManager:
         self.notifiers = []
         notify_cfg = config.get("notify", {})
 
-        # 按顺序注册各渠道，只有配置了关键字段才会启用
-        if notify_cfg.get("qmsg", {}).get("key"):
-            self.notifiers.append(QmsgNotifier(notify_cfg["qmsg"]))
+        # 兼容老版本的 qmsg_key 配置
+        legacy_qmsg_key = config.get("qmsg_key")
+        qmsg_key = notify_cfg.get("qmsg", {}).get("key") or legacy_qmsg_key
+
+        if qmsg_key:
+            qmsg_cfg = notify_cfg.get("qmsg", {})
+            qmsg_cfg["key"] = qmsg_key
+            self.notifiers.append(QmsgNotifier(qmsg_cfg))
 
         if notify_cfg.get("onebot", {}).get("url"):
             self.notifiers.append(OneBotNotifier(notify_cfg["onebot"]))
 
         if notify_cfg.get("email", {}).get("smtp_host"):
-            self.notifiers.append(EmailNotifier(notify_cfg["email"]))
+            email_cfg = notify_cfg["email"]
+            # 强制将密码转为字符串，防止纯数字密码报错
+            email_cfg["password"] = str(email_cfg.get("password", ""))
+            self.notifiers.append(EmailNotifier(email_cfg))
 
         if notify_cfg.get("wecom", {}).get("webhook_url"):
             self.notifiers.append(WeComNotifier(notify_cfg["wecom"]))

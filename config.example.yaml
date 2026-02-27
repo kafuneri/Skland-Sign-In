@@ -1,13 +1,14 @@
-# ======================== 基础配置 ========================
+# ======================== 基础配置 (Global Settings) ========================
 
-# 日志等级: "debug" (显示详细请求) 或 "info" (只显示结果)
+# 日志输出等级。可选值: "debug" (输出详细运行日志) 或 "info" (仅输出运行结果)
 log_level: "info"
 
-# 定时任务 cron 表达式 (Docker 环境下生效)
-# 默认每天凌晨 1:00 执行
+# 容器化环境下的定时任务触发周期 (Cron 表达式)。默认配置为每天凌晨 1:00 执行
 cron: "0 1 * * *"
 
-# ======================== 用户列表 ========================
+# ======================== 账户配置 (User Configuration) ========================
+# 可配置多个账户，按需增加列表项即可
+# 账户为自定义标识名称，仅用于日志输出与消息通知区分
 
 users:
   - nickname: "我的大号"
@@ -16,49 +17,67 @@ users:
   - nickname: "我的小号"
     token: "这里填入另一个Token"
 
-# ======================== 通知配置 ========================
-# 只需填写你要使用的渠道，留空或不填则不启用该渠道
+# ======================== 消息推送配置 (Notification Settings) ========================
+# 填写相应渠道的参数即可启用对应推送服务。不需要使用的渠道请保持对应参数为空 ("")。
 
 notify:
-
   # ---------- Qmsg 酱 ----------
   qmsg:
-    key: ""# Qmsg Key
-    # base_url: "https://qmsg.zendee.cn" # 可选，自定义接口地址
+    # Qmsg 推送密钥
+    key: ""
+    # 自定义 API 接口地址 (可选配置)
+    # base_url: "https://qmsg.zendee.cn"
 
-    # ---------- OneBot V11 (NapCat / go-cqhttp 等) ----------
-  # 私聊和群聊可同时配置，均支持多个目标
+  # ---------- OneBot V11 标准协议 (NapCat / go-cqhttp 等) ----------
+  # 支持同时下发私聊与群聊消息，目标 ID 均支持配置多个
   onebot:
-    url: ""                # OneBot HTTP 地址，如 http://127.0.0.1:3000
-    access_token: ""                     # 可选，鉴权 Token
-    private_ids:                         # 私聊 QQ 号列表 (可填多个)
+    # OneBot HTTP 接口地址，例如: "http://127.0.0.1:3000"
+    url: ""
+    # HTTP API 鉴权密钥 (未开启鉴权请留空)
+    access_token: ""
+    # 接收私聊消息的 QQ 号列表
+    private_ids:
       # - 123456789
       # - 987654321
-    group_ids:# 群号列表 (可填多个）
+    # 接收群聊消息的 QQ 群号列表
+    group_ids:
       # - 111222333
       # - 444555666
 
-  # ---------- 邮件 ----------
+  # ---------- 邮件推送 (SMTP) ----------
   email:
-    smtp_host: ""# SMTP 服务器，如 smtp.qq.com
-    smtp_port: 465                       # 端口，SSL 一般 465，STARTTLS 一般 587
-    use_ssl: true                        # 是否使用 SSL
-    username: ""                         # 登录用户名 (通常是邮箱地址)
-    password: ""                         # 登录密码或授权码
-    sender: ""                           # 发件人地址 (留空则与 username 相同)
-    receiver: ""                         # 收件人地址
+    # SMTP 服务器地址，例如: "smtp.qq.com"
+    smtp_host: ""
+    # SMTP 服务器端口，SSL 协议一般为 465，STARTTLS 协议一般为 587
+    smtp_port: 465
+    # 是否启用 SSL 加密连接
+    use_ssl: true
+    # 邮箱账号 (通常为完整的邮箱地址)
+    username: ""
+    # 邮箱登录密码或第三方客户端授权码
+    password: ""
+    # 发件人地址 (如保持为空，则默认使用 username 作为发件人)
+    sender: ""
+    # 接收通知的目标邮箱地址
+    receiver: ""
 
   # ---------- 企业微信群机器人 ----------
   wecom:
-    webhook_url: ""# 企业微信机器人 Webhook 地址
+    # 企业微信群机器人 Webhook 完整地址
+    webhook_url: ""
 
-  # ---------- 微信服务号 (公众号模板消息) ----------
+  # ---------- 微信服务号 (基于公众号模板消息) ----------
   wechat_mp:
-    app_id: ""# 公众号 AppID
-    app_secret: ""                       # 公众号 AppSecret
-    template_id: ""                      # 模板消息 ID
-    open_id: ""                          # 接收者的 OpenID
+    # 微信公众号 AppID
+    app_id: ""
+    # 微信公众号 AppSecret
+    app_secret: ""
+    # 微信公众号模板消息 ID
+    template_id: ""
+    # 接收消息用户的 OpenID
+    open_id: ""
 
-  # ---------- Server酱 ----------
+  # ---------- Server酱 (Turbo版) ----------
   serverchan:
-    send_key: ""                         # Server酱 SendKey
+    # Server酱 SendKey 通道密钥
+    send_key: ""

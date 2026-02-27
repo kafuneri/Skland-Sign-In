@@ -1,4 +1,23 @@
-.git
-__pycache__
+# Git 目录
+.git/
+.gitignore
+
+# Python 缓存
+__pycache__/
 *.pyc
+*.pyo
+
+# 虚拟环境
+venv/
+env/
+.venv/
+
+# 配置文件
+config.yaml
 .env
+
+# 其他构建时不需要的文件
+docker-compose.yml
+Dockerfile
+README.md
+LICENSE

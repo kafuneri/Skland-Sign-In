@@ -1,32 +1,22 @@
 # Skland-Sign-In
 
 森空岛自动签到脚本，用于实现森空岛平台下《明日方舟》与《终末地》的每日自动签到。  
-支持多账号管理及 Qmsg酱 消息推送。
+支持多账号管理及多种消息推送渠道。
 
 ## 环境要求
 
 * Python 3.8 或更高版本
-
-## 安装步骤
-
-1. 克隆或下载本项目到本地。
-```bash
-git clone https://github.com/kafuneri/Skland-Sign-In.git && cd Skland-Sign-In
-```
-2. 在项目根目录下，安装所需依赖：
-
-```bash
-pip install -r requirements.txt
-
-```
+* 或 Docker 环境
 
 ## 配置指南
 
-在使用前，请将目录下的 `config.example.yaml` 文件另存为`config.yaml`进行配置。
+在使用前，请将目录下的 `config.example.yaml` 文件另存为 `config.yaml` 进行配置。
+
 ```bash
 cp config.example.yaml config.yaml
 
 ```
+
 ### 1. 填写用户信息
 
 在 `users` 列表下填写账号昵称和 Token。
@@ -38,51 +28,76 @@ cp config.example.yaml config.yaml
 3. 页面将返回一段 JSON 数据。请复制 `content` 字段中的长字符串。
 * 数据示例：`{"code":0,"data":{"content":"请复制这一长串字符"}}`
 
-
-4. 将复制的字符串填入 `config.yaml` 的 `token` 字段。
-
-> 注意：Token 等同于账号凭证，请勿泄露给他人。
-
 ### 2. 配置消息推送 (可选)
 
-如果需要签到结果通知，本脚本支持 Qmsg酱 推送。
+本项目支持多种推送渠道，请在 `config.yaml` 的 `notify` 节点下配置：
 
-1. 注册并登录 [Qmsg酱](https://qmsg.zendee.cn/)。
-2. 在管理台获取你的 KEY。
-3. 将 KEY 填入 `config.yaml` 的 `qmsg_key` 字段。如果不使用推送，请留空。
+* **Qmsg 酱**：通过 QQ 发送通知。
+* **OneBot V11**：支持 NapCat、go-cqhttp 等协议，可推送至私聊或群聊。
+* **电子邮件 (SMTP)**：支持 QQ、网易等主流邮箱推送。
+* **企业微信**：通过群机器人 Webhook 推送。
+* **微信服务号**：通过公众号模板消息推送。
+* **Server 酱 (Turbo版)**：通过微信/手机客户端推送。
 
-### 配置文件示例
+---
 
-```yaml
-# 日志等级: debug (显示详细信息) 或 info (仅显示结果)
-log_level: "info"
+## 部署方法
 
-# Qmsg 推送 Key (选填，留空则不推送)
-qmsg_key: "你的Key"
+### 方案一：Docker 部署 (推荐)
 
-users:
-  - nickname: "账号A"
-    token: "从上述步骤获取的Token字符串"
-    
-  - nickname: "账号B"
-    token: "另一个Token"
+本项目内置了 Cron 定时任务（默认每天凌晨 01:00 运行），适合 NAS 或服务器环境。
+
+#### 使用 Docker Compose
+
+在项目目录下创建 `docker-compose.yml`（已内置）并运行：
+
+```bash
+docker-compose up -d
 
 ```
 
-## 运行方法
+#### 使用 Docker Run
 
-在终端中执行以下命令启动脚本：
+```bash
+docker run -d \
+  --name skland-sign \
+  -v $(pwd)/config.yaml:/app/config.yaml:ro \
+  -e TZ=Asia/Shanghai \
+  kafuneri/skland-sign-in:latest
 
+```
+
+### 方案二：本地直接运行
+
+1. 克隆本项目并安装依赖：
+```bash
+git clone https://github.com/kafuneri/Skland-Sign-In.git && cd Skland-Sign-In
+pip install -r requirements.txt
+
+```
+
+
+2. 执行签到脚本：
 ```bash
 python3 main.py
 
 ```
-
 脚本运行后会依次检查每个配置账号的签到状态：
 
 * 若未签到，则执行签到并获取奖励内容。
 * 若已签到，则跳过。
-* 运行结束后会输出简报，如果配置了 Qmsg，会发送推送到 QQ。
-* 建议配合计划任务实现每日自动运行，网上教程很多，此处不赘述。
+* 运行结束后会输出简报，如果配置了通知渠道Qmsg，会发送推送到 QQ。
 
-  
+---
+
+## 定时任务配置
+
+若使用 Docker 部署，可以通过修改 `config.yaml` 中的 `cron` 字段来自定义执行时间（Cron 表达式）。  
+若本地运行，建议配合计划任务实现每日自动运行，网上教程很多，此处不赘述。
+
+## 运行截图  
+<img width="366" height="295" alt="image" src="https://github.com/user-attachments/assets/55ee4bbc-3f3a-4e63-8746-3dcbc059ff90" />
+
+## 感谢以下项目
+
+* 本项目的核心 API 交互逻辑（`skland_api.py`）提取自 AstrBot 的开源插件 [astrbot_plugin_skland](https://github.com/AstrBotDevs/astrbot_plugin_skland)

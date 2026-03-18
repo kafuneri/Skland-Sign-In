@@ -13,6 +13,8 @@
 在使用前，请将目录下的 `config.example.yaml` 文件另存为 `config.yaml` 进行配置。
 
 ```bash
+# 拉取代码
+git clone https://github.com/kafuneri/Skland-Sign-In.git && cd Skland-Sign-In
 cp config.example.yaml config.yaml
 
 ```
@@ -69,9 +71,8 @@ docker run -d \
 
 ### 方案二：本地直接运行
 
-1. 克隆本项目并安装依赖：
+1. 克隆本项目后安装依赖：
 ```bash
-git clone https://github.com/kafuneri/Skland-Sign-In.git && cd Skland-Sign-In
 pip install -r requirements.txt
 
 ```

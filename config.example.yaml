@@ -81,3 +81,24 @@ notify:
   serverchan:
     # Server酱 SendKey 通道密钥
     send_key: ""
+
+  # ---------- Bark ----------
+  bark:
+    # Bark 设备 Key，可在 Bark App 中查看
+    key: ""
+    # 多设备推送时可使用 device_keys 列表代替 key
+    # device_keys:
+    #   - "设备Key1"
+    #   - "设备Key2"
+    # 自建 Bark Server 地址；使用官方服务时保持默认即可
+    base_url: "https://api.day.app"
+    # 通知分组名称 (可选)
+    group: "Skland"
+    # 通知铃声名称 (可选)
+    sound: ""
+    # 通知图标 URL，仅 iOS 15 或更高版本支持 (可选)
+    icon: ""
+    # 点击通知时跳转的 URL (可选)
+    url: ""
+    # 通知级别，可选值: critical、active、timeSensitive、passive
+    level: ""

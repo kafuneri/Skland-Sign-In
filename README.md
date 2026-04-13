@@ -40,6 +40,7 @@ cp config.example.yaml config.yaml
 * **企业微信**：通过群机器人 Webhook 推送。
 * **微信服务号**：通过公众号模板消息推送。
 * **Server 酱 (Turbo版)**：通过微信/手机客户端推送。
+* **Bark**：通过 Bark App 推送到 iOS 设备，支持官方服务和自建 Bark Server。
 
 ---
 

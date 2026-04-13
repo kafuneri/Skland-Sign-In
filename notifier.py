@@ -43,6 +43,10 @@ class NotifierManager:
         if notify_cfg.get("serverchan", {}).get("send_key"):
             self.notifiers.append(ServerChanNotifier(notify_cfg["serverchan"]))
 
+        bark_cfg = notify_cfg.get("bark", {})
+        if bark_cfg.get("key") or bark_cfg.get("device_key") or bark_cfg.get("device_keys"):
+            self.notifiers.append(BarkNotifier(bark_cfg))
+
         if not self.notifiers:
             logger.info("未配置任何通知渠道，跳过推送")
 
@@ -310,3 +314,67 @@ class ServerChanNotifier(BaseNotifier):
             else:
                 logger.error(f"[ServerChan] 推送失败: {result.get('message')}")
                 return False
+
+
+# ==================== Bark ====================
+class BarkNotifier(BaseNotifier):
+    name = "Bark"
+
+    def __init__(self, cfg: dict):
+        self.base_url = (cfg.get("base_url") or "https://api.day.app").rstrip("/")
+        self.device_keys = self._parse_device_keys(cfg)
+        self.group = cfg.get("group", "")
+        self.sound = cfg.get("sound", "")
+        self.icon = cfg.get("icon", "")
+        self.url = cfg.get("url", "")
+        self.level = cfg.get("level", "")
+
+    @staticmethod
+    def _parse_device_keys(cfg: dict) -> list[str]:
+        raw_keys = cfg.get("device_keys") or cfg.get("device_key") or cfg.get("key")
+        if isinstance(raw_keys, str):
+            return [key.strip() for key in raw_keys.split(",") if key.strip()]
+        if isinstance(raw_keys, list):
+            return [str(key).strip() for key in raw_keys if str(key).strip()]
+        return []
+
+    async def send(self, message: str) -> bool:
+        if not self.device_keys:
+            logger.error("[Bark] 未配置 key 或 device_keys")
+            return False
+
+        lines = message.split("\n")
+        title = lines[0] if lines else "森空岛签到通知"
+        body = "\n".join(lines[1:]).strip() if len(lines) > 1 else message
+        if not body:
+            body = message
+
+        payload = {
+            "title": title,
+            "body": body,
+        }
+        if len(self.device_keys) == 1:
+            payload["device_key"] = self.device_keys[0]
+        else:
+            payload["device_keys"] = self.device_keys
+
+        for key, value in {
+            "group": self.group,
+            "sound": self.sound,
+            "icon": self.icon,
+            "url": self.url,
+            "level": self.level,
+        }.items():
+            if value:
+                payload[key] = value
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(f"{self.base_url}/push", json=payload)
+            result = resp.json()
+
+            if resp.status_code == 200 and result.get("code") in (0, 200, None):
+                logger.info("[Bark] 推送成功")
+                return True
+
+            logger.error(f"[Bark] 推送失败: {result.get('message') or result}")
+            return False

@@ -61,5 +61,11 @@ jobs:
                   f.write("\n")
           PY
 
+      - name: Random delay
+        run: |
+          delay=$((RANDOM % 120 + 1))
+          echo "为了防止触发风控，随机延时 $delay 秒后开始执行签到..."
+          sleep $delay
+
       - name: Run sign-in
         run: python main.py

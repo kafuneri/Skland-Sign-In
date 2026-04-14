@@ -323,7 +323,7 @@ class BarkNotifier(BaseNotifier):
     def __init__(self, cfg: dict):
         self.base_url = (cfg.get("base_url") or "https://api.day.app").rstrip("/")
         self.device_keys = self._parse_device_keys(cfg)
-        self.group = cfg.get("group", "")
+        self.group = cfg.get("group") or "Skland"
         self.sound = cfg.get("sound", "")
         self.icon = cfg.get("icon", "")
         self.url = cfg.get("url", "")

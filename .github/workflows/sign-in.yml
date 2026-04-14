@@ -1,0 +1,65 @@
+name: Skland Sign In
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub Actions cron uses UTC. This is 01:00 in Asia/Shanghai.
+    - cron: "0 17 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skland-sign-in
+  cancel-in-progress: false
+
+jobs:
+  sign-in:
+    name: Run sign-in
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TZ: Asia/Shanghai
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Write config
+        env:
+          SKLAND_CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+
+          import yaml
+
+          config = os.environ.get("SKLAND_CONFIG_YAML", "")
+          if not config.strip():
+              sys.exit("GitHub Secret CONFIG_YAML is empty. Add your config.yaml content as a repository secret.")
+
+          parsed = yaml.safe_load(config)
+          if not isinstance(parsed, dict):
+              sys.exit("CONFIG_YAML must be a YAML mapping.")
+          if not parsed.get("users"):
+              sys.exit("CONFIG_YAML must contain at least one user under users.")
+
+          with open("config.yaml", "w", encoding="utf-8") as f:
+              f.write(config)
+              if not config.endswith("\n"):
+                  f.write("\n")
+          PY
+
+      - name: Run sign-in
+        run: python main.py

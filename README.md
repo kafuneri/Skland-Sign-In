@@ -70,6 +70,7 @@ docker run -d \
 
 ```
 
+
 ### 方案二：本地直接运行
 
 1. 克隆本项目后安装依赖：
@@ -90,11 +91,24 @@ python3 main.py
 * 若已签到，则跳过。
 * 运行结束后会输出简报，如果配置了通知渠道Qmsg，会发送推送到 QQ。
 
+
+### 方案三：GitHub Actions 自动运行
+
+项目已内置 GitHub Actions 工作流，默认每天北京时间 01:00 自动运行一次，也支持在 GitHub 页面手动触发。
+
+1. 将本项目推送到你自己的 GitHub 仓库。
+2. 在仓库页面进入 `Settings` -> `Secrets and variables` -> `Actions`。
+3. 新增 Repository secret，名称填写 `CONFIG_YAML`，内容填写你完整的 `config.yaml` 文件内容。
+4. 进入 `Actions` -> `Skland Sign In`，点击 `Run workflow` 可手动测试运行。
+
+> 注意：GitHub Actions 的 Cron 表达式使用 UTC 时间。默认工作流配置 `0 17 * * *` 对应北京时间次日 01:00。如需修改时间，请编辑 `.github/workflows/sign-in.yml` 中的 `schedule.cron`。
+
 ---
 
 ## 定时任务配置
 
 若使用 Docker 部署，可以通过修改 `config.yaml` 中的 `cron` 字段来自定义执行时间（Cron 表达式）。  
+若使用 GitHub Actions 部署，请修改 `.github/workflows/sign-in.yml` 中的 `schedule.cron`。<br>
 若本地运行，建议配合计划任务实现每日自动运行，网上教程很多，此处不赘述。
 
 ## 运行截图  

@@ -7,7 +7,7 @@
 
 * Python 3.8 或更高版本
 * 或 Docker 环境
-> 如没有NAS或服务器环境，可以使用`GitHub Actions`签到，但海外网络存在触发森空岛风控的风险（目前未发现），另外使用 GitHub Actions 运行签到脚本存在违反 GitHub ToS 的风险，可能导致 GitHub 账号被封禁，请谨慎使用并自行承担后果。
+> 如没有NAS或服务器环境，可以使用`GitHub Actions`签到，但海外网络存在触发森空岛风控的风险（目前未发现），另外使用 GitHub Actions 运行签到脚本存在违反 GitHub ToS 的风险，请谨慎使用并自行承担后果。
 
 ## 配置指南
 
@@ -72,7 +72,20 @@ docker run -d \
 ```
 
 
-### 方案二：本地直接运行
+### 方案二：GitHub Actions 自动运行
+
+项目已内置 GitHub Actions 工作流，默认每天北京时间 01:00 自动运行一次，也可以在 GitHub 页面手动触发。
+
+1. 点击页面右上角的 Fork 按钮，将本项目推送到你自己的 GitHub 仓库。
+2. 在仓库页面进入 `Settings` -> `Secrets and variables` -> `Actions`。
+3. 新增 Repository secret，名称填写 `CONFIG_YAML`，内容填写你完整的 `config.yaml` 文件内容。
+4. 进入 `Actions` -> `Skland Sign In`，点击 `Run workflow` 可手动测试运行。
+
+> 注意：GitHub Actions 的 Cron 表达式使用 UTC 时间。默认工作流配置 `0 17 * * *` 对应北京时间次日 01:00。如需修改时间，请编辑 `.github/workflows/sign-in.yml` 中的 `schedule.cron`。
+
+
+ 
+### 方案三：源码运行
 
 1. 克隆本项目后安装依赖：
 ```bash
@@ -93,24 +106,13 @@ python3 main.py
 * 运行结束后会输出简报，如果配置了相关通知渠道（如 Qmsg、Bark、邮件等），则会发送对应的推送通知。
 
 
-### 方案三：GitHub Actions 自动运行
-
-项目已内置 GitHub Actions 工作流，默认每天北京时间 01:00 自动运行一次，也支持在 GitHub 页面手动触发。
-
-1. 点击页面右上角的 Fork 按钮，将本项目推送到你自己的 GitHub 仓库。
-2. 在仓库页面进入 `Settings` -> `Secrets and variables` -> `Actions`。
-3. 新增 Repository secret，名称填写 `CONFIG_YAML`，内容填写你完整的 `config.yaml` 文件内容。
-4. 进入 `Actions` -> `Skland Sign In`，点击 `Run workflow` 可手动测试运行。
-
-> 注意：GitHub Actions 的 Cron 表达式使用 UTC 时间。默认工作流配置 `0 17 * * *` 对应北京时间次日 01:00。如需修改时间，请编辑 `.github/workflows/sign-in.yml` 中的 `schedule.cron`。
-
 ---
 
 ## 定时任务配置
 
 若使用 Docker 部署，可以通过修改 `config.yaml` 中的 `cron` 字段来自定义执行时间（Cron 表达式）。  
 若使用 GitHub Actions 部署，请修改 `.github/workflows/sign-in.yml` 中的 `schedule.cron`。<br>
-若本地运行，建议配合计划任务实现每日自动运行，网上教程很多，此处不赘述。
+若源码运行，建议配合计划任务实现每日自动运行，网上教程很多，此处不赘述。
 
 ## 运行截图  
 <img width="366" height="295" alt="image" src="https://github.com/user-attachments/assets/55ee4bbc-3f3a-4e63-8746-3dcbc059ff90" />

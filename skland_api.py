@@ -552,10 +552,10 @@ class SklandAPI:
 
         return results
 
-    async def do_full_sign_in(self, user_token: str) -> tuple[list[SignInResult], str]:
+    async def do_full_sign_in(self, user_token: str, game_type: int = 0) -> tuple[list[SignInResult], str]:
         """
         Complete sign-in flow for a user token
-
+        game_type: 0=全部, 1=仅明日方舟, 2=仅终末地
         Returns: (list of results, nickname)
         """
         # Get authorization
@@ -574,23 +574,25 @@ class SklandAPI:
         results = []
 
         for binding in bindings:
-            if binding.app_code == "arknights":
+            # 引入 game_type 判断逻辑
+            if binding.app_code == "arknights" and game_type in (0, 1):
                 result = await self.sign_arknights(cred, binding)
                 results.append(result)
-            elif binding.app_code == "endfield":
+            elif binding.app_code == "endfield" and game_type in (0, 2):
                 endfield_results = await self.sign_endfield(cred, binding)
                 results.extend(endfield_results)
 
         return results, nickname
 
-    async def check_sign_in_status(self, user_token: str) -> tuple[dict[str, bool], str]:
+    async def check_sign_in_status(self, user_token: str, game_type: int = 0) -> tuple[dict[str, bool], str]:
         """
         Check sign-in status without signing in
 
         Returns: ({game: signed_today}, nickname)
         """
         try:
-            results, nickname = await self.do_full_sign_in(user_token)
+            # 将 game_type 传递给 do_full_sign_in
+            results, nickname = await self.do_full_sign_in(user_token, game_type)
 
             status = {"arknights": False, "endfield": False}
 

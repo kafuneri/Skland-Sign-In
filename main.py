@@ -61,9 +61,24 @@ async def run_sign_in():
     logger.info(f"开始执行签到任务，共 {len(users)} 个账号")
     
     # ================== 【提前获取设备指纹 (防风控献祭)】 ==================
+    # 重试次数与间隔均可通过 config.yaml 配置，用于应对偶发的森空岛风控 (如 code 1901)
+    did_retry_count = config.get("DID_RETRY_COUNT", 5)
+    try:
+        did_retry_count = int(did_retry_count)
+    except (ValueError, TypeError):
+        did_retry_count = 5
+    did_retry_count = max(1, min(10, did_retry_count))
+
+    did_retry_interval = config.get("DID_RETRY_INTERVAL_SECS", 60)
+    try:
+        did_retry_interval = int(did_retry_interval)
+    except (ValueError, TypeError):
+        did_retry_interval = 60
+    did_retry_interval = max(5, min(600, did_retry_interval))
+
     logger.info("正在初始化设备指纹...")
     did_success = False
-    for attempt in range(1, 4):  # 最多尝试 3 次获取设备 ID
+    for attempt in range(1, did_retry_count + 1):
         try:
             # 提前调用获取设备 ID，如果成功，会被 api 实例缓存在 self._did 中
             await api.get_device_id()
@@ -71,13 +86,14 @@ async def run_sign_in():
             logger.info("设备指纹初始化成功！")
             break
         except Exception as e:
-            logger.warning(f"获取设备指纹失败 (尝试 {attempt}/3): {e}")
-            if attempt < 3:
-                await asyncio.sleep(5)  # 失败后等待 5 秒再试，避开并发高峰
+            logger.warning(f"获取设备指纹失败 (尝试 {attempt}/{did_retry_count}): {e}")
+            if attempt < did_retry_count:
+                logger.info(f"将等待 {did_retry_interval} 秒后重试...")
+                await asyncio.sleep(did_retry_interval)  # 等待较长时间再重试，避开风控窗口
 
-    # 如果重试了 3 次依然失败，直接终止程序，不执行后续签到
+    # 如果重试了多次依然失败，直接终止程序，不执行后续签到
     if not did_success:
-        error_msg = "❌ 致命错误: 连续 3 次无法获取设备指纹 (可能触发风控)，本次签到任务已全部取消。"
+        error_msg = f"❌ 致命错误: 连续 {did_retry_count} 次无法获取设备指纹 (可能触发风控)，本次签到任务已全部取消。"
         logger.error(error_msg)
         notify_lines.append(error_msg)
         

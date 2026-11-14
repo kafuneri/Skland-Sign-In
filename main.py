@@ -15,19 +15,19 @@ async def run_sign_in():
     # 1. 加载配置
     try:
         with open("config.yaml", "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
+            config = yaml.safe_load(f) or {}
     except FileNotFoundError:
         logger.error("找不到 config.yaml 文件")
         return
 
     # 2. 日志等级控制
-    user_log_level = config.get("log_level", "info").lower()
+    user_log_level = str(config.get("log_level") or "info").lower()
     # 调整底层库日志等级
     for lib in ["httpx", "httpcore", "skland_api", "Qmsg"]:
         lib_logger = logging.getLogger(lib)
-        lib_logger.setLevel(logging.INFO if user_log_level == "debug" else WARNING)
+        lib_logger.setLevel(logging.INFO if user_log_level == "debug" else logging.WARNING)
 
-    users = config.get("users", [])
+    users = config.get("users") or []
 
     if not users:
         logger.warning("配置中没有发现用户信息")
@@ -80,107 +80,107 @@ async def run_sign_in():
     logger.info("正在初始化设备指纹...")
     did_success = False
     
-    # 限制设备指纹总重试最大时间为 180 秒，防止配置叠加后任务挂死
-    max_total_wait_secs = 180
-    start_time = time.monotonic()
+    try:
+        # 限制设备指纹总重试最大时间为 180 秒，防止配置叠加后任务挂死
+        max_total_wait_secs = 180
+        start_time = time.monotonic()
 
-    for attempt in range(1, did_retry_count + 1):
-        try:
-            # 提前调用获取设备 ID，如果成功，会被 api 实例缓存在 self._did 中
-            await api.get_device_id()
-            did_success = True  # 核心修复：更新状态标记，防止误判致命错误
-            logger.info("设备指纹初始化成功！")
-            break
-        except Exception as e:
-            logger.warning(f"获取设备指纹失败 (尝试 {attempt}/{did_retry_count}): {e}")
-            elapsed_time = time.monotonic() - start_time
-            if attempt < did_retry_count:
-                # 检查剩余时间预算是否充足
-                if elapsed_time + did_retry_interval > max_total_wait_secs:
-                    logger.warning("设备指纹重试总耗时已触碰时间上限，放弃后续重试。")
-                    break
-                logger.info(f"将等待 {did_retry_interval} 秒后重试...")
-                await asyncio.sleep(did_retry_interval)
+        for attempt in range(1, did_retry_count + 1):
+            try:
+                # 提前调用获取设备 ID，如果成功，会被 api 实例缓存在 self._did 中
+                await api.get_device_id()
+                did_success = True  # 核心修复：更新状态标记，防止误判致命错误
+                logger.info("设备指纹初始化成功！")
+                break
+            except Exception as e:
+                logger.warning(f"获取设备指纹失败 (尝试 {attempt}/{did_retry_count}): {e}")
+                elapsed_time = time.monotonic() - start_time
+                if attempt < did_retry_count:
+                    # 检查剩余时间预算是否充足
+                    if elapsed_time + did_retry_interval > max_total_wait_secs:
+                        logger.warning("设备指纹重试总耗时已触碰时间上限，放弃后续重试。")
+                        break
+                    logger.info(f"将等待 {did_retry_interval} 秒后重试...")
+                    await asyncio.sleep(did_retry_interval)
 
-    # 如果重试了多次依然失败，直接终止程序，不执行后续签到
-    if not did_success:
-        error_msg = f"❌ 致命错误: 连续获取设备指纹失败 (可能触发风控)，本次签到任务已全部取消。"
-        logger.error(error_msg)
-        notify_lines.append(error_msg)
-        
-        # 发送失败通知并退出
-        final_message = "\n".join(notify_lines)
-        await notifier.send_all(final_message)
+        # 如果重试了多次依然失败，直接终止程序，不执行后续签到
+        if not did_success:
+            error_msg = f"❌ 致命错误: 连续获取设备指纹失败 (可能触发风控)，本次签到任务已全部取消。"
+            logger.error(error_msg)
+            notify_lines.append(error_msg)
+            
+            # 发送失败通知并退出
+            final_message = "\n".join(notify_lines)
+            await notifier.send_all(final_message)
+            return
+        # ==================================================================
+
+        # 遍历用户，使用 enumerate 获取序号 (从1开始)
+        for index, user in enumerate(users, 1):
+            nickname_cfg = user.get("nickname", "未知用户")
+            token = user.get("token")
+            
+            # 从配置中读取 game_type，如果没有配置则默认为 0 (全部签到)
+            # 0=全部, 1=仅明日方舟, 2=仅终末地
+            game_type = int(user.get("game_type", 0)) 
+            
+            # 格式要求: 🌈 No.1(nickname1):
+            user_header = f"🌈 No.{index}({nickname_cfg}):"
+            notify_lines.append(user_header)
+            logger.info(f"正在处理: {nickname_cfg}")
+
+            if not token:
+                logger.error(f"  [{nickname_cfg}] 未配置 Token")
+                notify_lines.append("❌ 账号配置错误: 缺少Token")
+                notify_lines.append("") 
+                continue
+                
+            try:
+                # 执行签到 (传入 game_type 参数)
+                results, official_nickname = await api.do_full_sign_in(token, game_type)
+                
+                if not results:
+                    notify_lines.append("❌ 未找到绑定角色")
+                    logger.warning(f"  [{nickname_cfg}] 未找到角色")
+                
+                for r in results:
+                    # 状态判定逻辑
+                    # 成功 -> ✅, 成功 (奖励)
+                    # 已签到 -> ✅, 已签
+                    # 失败 -> ❌, 失败 (原因)
+                    
+                    is_signed_already = not r.success and api.is_signed_already_error(r.error)
+                    
+                    if r.success:
+                        icon = "✅"
+                        status_text = "成功"
+                        # 如果有奖励，显示具体奖励；否则留空
+                        detail = f" ({', '.join(r.awards)})" if r.awards else ""
+                    elif is_signed_already:
+                        icon = "✅"
+                        status_text = "已签"
+                        detail = ""
+                    else:
+                        icon = "❌"
+                        status_text = "失败"
+                        detail = f" ({r.error})"
+
+                    # 拼接单行: ✅ 明日方舟: 成功 (龙门币x500)
+                    line = f"{icon} {r.game}: {status_text}{detail}"
+                    notify_lines.append(line)
+                    
+                    # 控制台输出简单日志
+                    logger.info(f"  - {line}")
+
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"  [{nickname_cfg}] 异常: {error_msg}")
+                notify_lines.append(f"❌ 系统错误: {error_msg}")
+
+            # 每个用户结束后加个空行，美观
+            notify_lines.append("")
+    finally:
         await api.close()
-        return
-    # ==================================================================
-
-    # 遍历用户，使用 enumerate 获取序号 (从1开始)
-    for index, user in enumerate(users, 1):
-        nickname_cfg = user.get("nickname", "未知用户")
-        token = user.get("token")
-        
-        # 从配置中读取 game_type，如果没有配置则默认为 0 (全部签到)
-        # 0=全部, 1=仅明日方舟, 2=仅终末地
-        game_type = int(user.get("game_type", 0)) 
-        
-        # 格式要求: 🌈 No.1(nickname1):
-        user_header = f"🌈 No.{index}({nickname_cfg}):"
-        notify_lines.append(user_header)
-        logger.info(f"正在处理: {nickname_cfg}")
-
-        if not token:
-            logger.error(f"  [{nickname_cfg}] 未配置 Token")
-            notify_lines.append("❌ 账号配置错误: 缺少Token")
-            notify_lines.append("") 
-            continue
-            
-        try:
-            # 执行签到 (传入 game_type 参数)
-            results, official_nickname = await api.do_full_sign_in(token, game_type)
-            
-            if not results:
-                notify_lines.append("❌ 未找到绑定角色")
-                logger.warning(f"  [{nickname_cfg}] 未找到角色")
-            
-            for r in results:
-                # 状态判定逻辑
-                # 成功 -> ✅, 成功 (奖励)
-                # 已签到 -> ✅, 已签
-                # 失败 -> ❌, 失败 (原因)
-                
-                is_signed_already = not r.success and any(k in r.error for k in ["已签到", "重复", "already"])
-                
-                if r.success:
-                    icon = "✅"
-                    status_text = "成功"
-                    # 如果有奖励，显示具体奖励；否则留空
-                    detail = f" ({', '.join(r.awards)})" if r.awards else ""
-                elif is_signed_already:
-                    icon = "✅"
-                    status_text = "已签"
-                    detail = ""
-                else:
-                    icon = "❌"
-                    status_text = "失败"
-                    detail = f" ({r.error})"
-
-                # 拼接单行: ✅ 明日方舟: 成功 (龙门币x500)
-                line = f"{icon} {r.game}: {status_text}{detail}"
-                notify_lines.append(line)
-                
-                # 控制台输出简单日志
-                logger.info(f"  - {line}")
-
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"  [{nickname_cfg}] 异常: {error_msg}")
-            notify_lines.append(f"❌ 系统错误: {error_msg}")
-
-        # 每个用户结束后加个空行，美观
-        notify_lines.append("")
-
-    await api.close()
     
     # 4. 发送推送
     while notify_lines and notify_lines[-1] == "":
@@ -190,9 +190,6 @@ async def run_sign_in():
     await notifier.send_all(final_message)
         
     logger.info("所有任务已完成")
-
-# 补充缺失的常量定义 (防止上面代码报错)
-WARNING = logging.WARNING
 
 if __name__ == "__main__":
     asyncio.run(run_sign_in())

@@ -12,6 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
 logger = logging.getLogger("notifier")
+DEFAULT_HTTP_TIMEOUT = 10.0
 
 
 class NotifierManager:
@@ -19,52 +20,56 @@ class NotifierManager:
 
     def __init__(self, config: dict):
         self.notifiers = []
-        notify_cfg = config.get("notify", {})
+        notify_cfg = config.get("notify") or {}
 
         # 兼容老版本的 qmsg_key 配置
         legacy_qmsg_key = config.get("qmsg_key")
-        qmsg_key = notify_cfg.get("qmsg", {}).get("key") or legacy_qmsg_key
+        qmsg_cfg = dict(notify_cfg.get("qmsg") or {})
+        qmsg_key = qmsg_cfg.get("key") or legacy_qmsg_key
 
         if qmsg_key:
-            qmsg_cfg = notify_cfg.get("qmsg", {})
             qmsg_cfg["key"] = qmsg_key
             self.notifiers.append(QmsgNotifier(qmsg_cfg))
 
-        if notify_cfg.get("onebot", {}).get("url"):
-            self.notifiers.append(OneBotNotifier(notify_cfg["onebot"]))
+        onebot_cfg = notify_cfg.get("onebot") or {}
+        if onebot_cfg.get("url"):
+            self.notifiers.append(OneBotNotifier(onebot_cfg))
 
-        if notify_cfg.get("email", {}).get("smtp_host"):
-            email_cfg = notify_cfg["email"]
+        email_cfg = dict(notify_cfg.get("email") or {})
+        if email_cfg.get("smtp_host"):
             # 强制将密码转为字符串，防止纯数字密码报错
             email_cfg["password"] = str(email_cfg.get("password", ""))
             self.notifiers.append(EmailNotifier(email_cfg))
 
-        if notify_cfg.get("wecom", {}).get("webhook_url"):
-            self.notifiers.append(WeComNotifier(notify_cfg["wecom"]))
+        wecom_cfg = notify_cfg.get("wecom") or {}
+        if wecom_cfg.get("webhook_url"):
+            self.notifiers.append(WeComNotifier(wecom_cfg))
 
-        if notify_cfg.get("wechat_mp", {}).get("app_id"):
-            self.notifiers.append(WeChatMPNotifier(notify_cfg["wechat_mp"]))
+        wechat_mp_cfg = notify_cfg.get("wechat_mp") or {}
+        if wechat_mp_cfg.get("app_id"):
+            self.notifiers.append(WeChatMPNotifier(wechat_mp_cfg))
 
-        if notify_cfg.get("serverchan", {}).get("send_key"):
-            self.notifiers.append(ServerChanNotifier(notify_cfg["serverchan"]))
+        serverchan_cfg = notify_cfg.get("serverchan") or {}
+        if serverchan_cfg.get("send_key"):
+            self.notifiers.append(ServerChanNotifier(serverchan_cfg))
 
-        sc3_cfg = notify_cfg.get("serverchan3", {})
+        sc3_cfg = notify_cfg.get("serverchan3") or {}
         if sc3_cfg.get("send_key") or sc3_cfg.get("send_keys"):
             self.notifiers.append(ServerChan3Notifier(sc3_cfg))
 
-        bark_cfg = notify_cfg.get("bark", {})
+        bark_cfg = notify_cfg.get("bark") or {}
         if bark_cfg.get("key") or bark_cfg.get("device_key") or bark_cfg.get("device_keys"):
             self.notifiers.append(BarkNotifier(bark_cfg))
         
-        telegram_cfg = notify_cfg.get("telegram", {})
+        telegram_cfg = notify_cfg.get("telegram") or {}
         if telegram_cfg.get("bot_token") and telegram_cfg.get("chat_id"):
             self.notifiers.append(TelegramNotifier(telegram_cfg))
 
-        dingtalk_cfg = notify_cfg.get("dingtalk", {})
+        dingtalk_cfg = notify_cfg.get("dingtalk") or {}
         if dingtalk_cfg.get("webhook_url"):
             self.notifiers.append(DingTalkNotifier(dingtalk_cfg))
         
-        custom_webhook_cfg = notify_cfg.get("custom_webhook", {})
+        custom_webhook_cfg = notify_cfg.get("custom_webhook") or {}
         if custom_webhook_cfg.get("url"):
             self.notifiers.append(CustomWebhookNotifier(custom_webhook_cfg))    
 
@@ -101,7 +106,7 @@ class QmsgNotifier(BaseNotifier):
 
     async def send(self, message: str) -> bool:
         url = f"{self.base_url}/send/{self.key}"
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             resp = await client.post(url, data={"msg": message})
             result = resp.json()
             if result.get("success"):
@@ -144,7 +149,7 @@ class OneBotNotifier(BaseNotifier):
 
         all_success = True
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             # 发送私聊
             for user_id in self.private_ids:
                 try:
@@ -199,7 +204,7 @@ class EmailNotifier(BaseNotifier):
     async def send(self, message: str) -> bool:
         # 邮件是同步操作，用 asyncio 包装
         import asyncio
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._send_sync, message)
 
     def _send_sync(self, message: str) -> bool:
@@ -214,14 +219,15 @@ class EmailNotifier(BaseNotifier):
             msg.attach(MIMEText(html_body, "html", "utf-8"))
 
             if self.use_ssl:
-                server = smtplib.SMTP_SSL(self.smtp_host, self.smtp_port)
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=15) as server:
+                    server.login(self.username, self.password)
+                    server.sendmail(self.sender, [self.receiver], msg.as_string())
             else:
-                server = smtplib.SMTP(self.smtp_host, self.smtp_port)
-                server.starttls()
+                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=15) as server:
+                    server.starttls()
+                    server.login(self.username, self.password)
+                    server.sendmail(self.sender, [self.receiver], msg.as_string())
 
-            server.login(self.username, self.password)
-            server.sendmail(self.sender, [self.receiver], msg.as_string())
-            server.quit()
             logger.info("[Email] 推送成功")
             return True
         except Exception as e:
@@ -241,7 +247,7 @@ class WeComNotifier(BaseNotifier):
             "msgtype": "text",
             "text": {"content": message}
         }
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             resp = await client.post(self.webhook_url, json=payload)
             result = resp.json()
             if result.get("errcode") == 0:
@@ -269,7 +275,7 @@ class WeChatMPNotifier(BaseNotifier):
             "appid": self.app_id,
             "secret": self.app_secret,
         }
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             resp = await client.get(url, params=params)
             data = resp.json()
             if "access_token" in data:
@@ -297,7 +303,7 @@ class WeChatMPNotifier(BaseNotifier):
                 }
             }
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
                 resp = await client.post(url, json=payload)
                 result = resp.json()
                 if result.get("errcode") == 0:
@@ -323,7 +329,7 @@ class ServerChanNotifier(BaseNotifier):
         lines = message.split("\n")
         title = lines[0] if lines else "森空岛签到通知"
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             resp = await client.post(url, data={
                 "title": title,
                 "desp": message,
@@ -389,7 +395,7 @@ class BarkNotifier(BaseNotifier):
             if value:
                 payload[key] = value
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             resp = await client.post(f"{self.base_url}/push", json=payload)
             result = resp.json()
 
@@ -437,11 +443,11 @@ class ServerChan3Notifier(BaseNotifier):
         headers = {"Content-Type": "application/json;charset=utf-8"}
 
         all_success = True
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             for key in self.send_keys:
                 try:
                     url = self._build_url(key)
-                    resp = await client.post(url, json=payload, headers=headers, timeout=10)
+                    resp = await client.post(url, json=payload, headers=headers)
                     result = resp.json()
                     if result.get("code") == 0:
                         logger.info(f"[ServerChan3] 推送成功 -> {key[:8]}...")
@@ -474,7 +480,7 @@ class TelegramNotifier(BaseNotifier):
             "text": message
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             try:
                 resp = await client.post(url, json=payload)
                 result = resp.json()
@@ -552,8 +558,8 @@ class DingTalkNotifier(BaseNotifier):
 
         try:
             url = self._build_signed_url()
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(url, json=payload, timeout=10)
+            async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+                resp = await client.post(url, json=payload)
 
             try:
                 result = resp.json()
@@ -585,10 +591,11 @@ class CustomWebhookNotifier(BaseNotifier):
 
     def __init__(self, cfg: dict):
         self.url = cfg.get("url", "")
-        self.method = cfg.get("method", "POST").upper()
-        self.headers = cfg.get("headers", {})
+        self.method = (cfg.get("method") or "POST").upper()
+        self.headers = cfg.get("headers") or {}
         # 默认回退到一个基础的 json 结构
-        self.body_template = cfg.get("body_template", {"content": "{{message}}"})
+        body_template = cfg.get("body_template")
+        self.body_template = body_template if body_template is not None else {"content": "{{message}}"}
 
     def _format_payload(self, template, message: str):
         """递归遍历字典或列表，替换占位符"""
@@ -609,7 +616,7 @@ class CustomWebhookNotifier(BaseNotifier):
         # 将模板中的 {{message}} 渲染为真实的推送内容
         payload = self._format_payload(self.body_template, message)
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             try:
                 kwargs = {"headers": self.headers}
                 

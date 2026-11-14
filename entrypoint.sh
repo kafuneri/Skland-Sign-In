@@ -4,10 +4,11 @@ set -e
 CRON_EXPR=$(python3 -c "
 import yaml
 try:
-    with open('config.yaml', 'r') as f:
+    with open('config.yaml', 'r', encoding='utf-8') as f:
         cfg = yaml.safe_load(f)
-    print(cfg.get('cron', '0 1 * * *'))
-except:
+    cron = cfg.get('cron') if isinstance(cfg, dict) else None
+    print(str(cron).strip() if cron and str(cron).strip() else '0 1 * * *')
+except Exception:
     print('0 1 * * *')
 ")
 

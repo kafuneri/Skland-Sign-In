@@ -125,15 +125,19 @@ class SklandAPI:
         self._client: httpx.AsyncClient | None = None
         self._did: str | None = None
 
+    def is_signed_already_error(self, error: str) -> bool:
+        """Check if an error message indicates already signed today"""
+        error_lower = error.lower() if error else ""
+        # Match various "already signed" messages
+        return any(keyword in error_lower for keyword in [
+            "已签到", "请勿重复", "重复签到", "already", "签到过", "今日已"
+        ])
+
     def _is_signed_today(self, result: SignInResult) -> bool:
         """Check if the result indicates already signed today"""
         if result.success:
             return True
-        error = result.error.lower() if result.error else ""
-        # Match various "already signed" messages
-        return any(keyword in error for keyword in [
-            "已签到", "请勿重复", "重复签到", "already", "签到过", "今日已"
-        ])
+        return self.is_signed_already_error(result.error)
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
@@ -160,8 +164,10 @@ class SklandAPI:
             try:
                 if method.upper() == "GET":
                     resp = await client.get(url, headers=headers)
-                else:
+                elif json_data is not None:
                     resp = await client.post(url, headers=headers, json=json_data)
+                else:
+                    resp = await client.post(url, headers=headers)
                 return resp.json()
             except Exception as e:
                 last_error = e
@@ -519,9 +525,20 @@ class SklandAPI:
             headers["referer"] = "https://game.skland.com/"
             headers["origin"] = "https://game.skland.com/"
 
-            client = await self._get_client()
-            resp = await client.post(url, headers=headers)
-            response = resp.json()
+            try:
+                response = await self._request("POST", url, headers=headers)
+            except Exception as e:
+                logger.error(f"[终末地] {role_nickname} sign-in request failed: {e}")
+                results.append(
+                    SignInResult(
+                        success=False,
+                        game="终末地",
+                        nickname=role_nickname,
+                        channel=binding.channel_name,
+                        error=str(e),
+                    )
+                )
+                continue
 
             # Log the response for debugging
             logger.info(f"[终末地] {role_nickname} sign-in response: {json.dumps(response, ensure_ascii=False)}")
